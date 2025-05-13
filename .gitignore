@@ -1,0 +1,21 @@
+# Node.js
+node_modules/
+.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+
+# Logs
+logs/
+*.log
+
+# VS Code
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# MongoDB Key files (si usaste Firebase antes)
+firebase-key.json
