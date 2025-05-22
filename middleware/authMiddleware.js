@@ -1,17 +1,30 @@
 const jwt = require('jsonwebtoken');
-const JWTSECRET =process.env.JWTSECRET;
+const User = require('../models/userModel');
 
-const auth = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).send({ error: 'Token faltante' });
+const protect = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'No autorizado, token ausente' });
+  }
+
+  const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, JWTSECRET);
-    req.user = decoded;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = await User.findById(decoded.id).select('-password');
     next();
-  } catch {
-    res.status(401).send({ error: 'Token inválido' });
+  } catch (err) {
+    return res.status(401).json({ message: 'Token inválido o expirado' });
   }
 };
 
-module.exports = auth;
+const adminOnly = (req, res, next) => {
+  if (req.user?.type === 'admin') {
+    next();
+  } else {
+    return res.status(403).json({ message: 'Acceso solo para administradores' });
+  }
+};
+
+module.exports = { protect, adminOnly };
