@@ -50,7 +50,7 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-exports.getUsers = async (req, res) => {
+exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find().select('-password');
     res.json(users);
@@ -82,6 +82,46 @@ exports.updateUserRole = async (req, res) => {
     res.json({ message: `Tipo de usuario actualizado a ${type}` });
   } catch (err) {
     res.status(500).json({ message: 'Error al actualizar el tipo de usuario', error: err.message });
+  }
+};
+
+
+exports.changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    const user = await User.findById(req.user._id);
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Contraseña actual incorrecta' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ message: 'Contraseña actualizada con éxito' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error al cambiar contraseña' });
+  }
+};
+
+
+exports.getUsers = async (req, res) => {
+  const keyword = req.query.search
+    ? {
+        $or: [
+          { fullName: { $regex: req.query.search, $options: 'i' } },
+          { email: { $regex: req.query.search, $options: 'i' } }
+        ]
+      }
+    : {};
+
+  try {
+    const users = await User.findOne(keyword).select('-password');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: 'Error al obtener usuarios' });
   }
 };
 

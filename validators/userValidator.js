@@ -25,3 +25,11 @@ exports.updateRoleValidation = [
     .isIn(['admin', 'normal'])
     .withMessage('Tipo debe ser admin o normal')
 ];
+
+exports.changePasswordValidation = [
+  body('currentPassword')
+    .notEmpty().withMessage('Debes ingresar tu contraseña actual'),
+
+  body('newPassword')
+    .isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres')
+];
