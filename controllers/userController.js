@@ -1,128 +1,65 @@
-const User = require('../models/userModel');
 const bcrypt = require('bcrypt');
-const generateToken = require('../utils/tokenUtils');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 exports.registerUser = async (req, res) => {
-  const { fullName, email, password, type } = req.body;
+  const { fullName, email, password } = req.body;
+
   try {
-    const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ message: 'Email ya registrado' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'El usuario ya existe' });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({
+
+    const newUser = new User({
       fullName,
       email,
       password: hashedPassword,
-      type
+      type: 'normal'
     });
 
-    res.status(201).json({
-      _id: user._id,
-      fullName: user.fullName,
-      email: user.email,
-      type: user.type
-    });
+    await newUser.save();
+    res.status(201).json({ message: 'Usuario registrado correctamente' });
   } catch (err) {
-    res.status(500).json({ message: 'Error al crear usuario', error: err.message });
+    console.error(err);
+    res.status(500).json({ message: 'Error al registrar usuario' });
   }
 };
 
-exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Credenciales inválidas' });
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(400).json({ message: 'Credenciales inválidas' });
-
-    const token = generateToken(user);
-
-    res.json({
-      _id: user._id,
-      fullName: user.fullName,
-      email: user.email,
-      type: user.type,
-      token
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Error en login', error: err.message });
-  }
-};
-
-exports.getAllUsers = async (req, res) => {
-  try {
-    const users = await User.find().select('-password');
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ message: 'Error al obtener usuarios' });
-  }
-};
-
-
-exports.updateUserRole = async (req, res) => {
-  const { id } = req.params;
-  const { type } = req.body;
+exports.createUser = async (req, res) => {
+  const { fullName, password, token } = req.body;
 
   try {
-    const user = await User.findById(id);
-
-    if (!user) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    } 
-    
-    if (req.user._id.toString() === id) {
-  return res.status(400).json({ message: 'No puedes cambiar tu propio rol' });
+    if (!token) {
+      return res.status(400).json({ message: 'Token de invitación requerido' });
     }
 
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const email = decoded.email;
 
-    user.type = type;
-    await user.save();
-
-    res.json({ message: `Tipo de usuario actualizado a ${type}` });
-  } catch (err) {
-    res.status(500).json({ message: 'Error al actualizar el tipo de usuario', error: err.message });
-  }
-};
-
-
-exports.changePassword = async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-
-  try {
-    const user = await User.findById(req.user._id);
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Contraseña actual incorrecta' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'El usuario ya existe' });
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    res.json({ message: 'Contraseña actualizada con éxito' });
+    const newUser = new User({
+      fullName,
+      email,
+      password: hashedPassword,
+      type: 'normal'
+    });
+
+    await newUser.save();
+    res.status(201).json({ message: 'Usuario creado correctamente' });
   } catch (err) {
-    res.status(500).json({ message: 'Error al cambiar contraseña' });
+    console.error(err);
+    if (err.name === 'TokenExpiredError') {
+      return res.status(400).json({ message: 'El token de invitación ha expirado' });
+    }
+    res.status(500).json({ message: 'Error al crear usuario' });
   }
 };
-
-
-exports.getUsers = async (req, res) => {
-  const keyword = req.query.search
-    ? {
-        $or: [
-          { fullName: { $regex: req.query.search, $options: 'i' } },
-          { email: { $regex: req.query.search, $options: 'i' } }
-        ]
-      }
-    : {};
-
-  try {
-    const users = await User.findOne(keyword).select('-password');
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ message: 'Error al obtener usuarios' });
-  }
-};
-
-
