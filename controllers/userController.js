@@ -1,6 +1,6 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const User = require('../models/userModel');
 
 exports.registerUser = async (req, res) => {
   const { fullName, email, password } = req.body;
@@ -63,3 +63,105 @@ exports.createUser = async (req, res) => {
     res.status(500).json({ message: 'Error al crear usuario' });
   }
 };
+
+
+exports.loginUser = async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: 'Credenciales inválidas' });
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(400).json({ message: 'Credenciales inválidas' });
+
+    const token = generateToken(user);
+
+    res.json({
+      _id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      type: user.type,
+      token
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error en login', error: err.message });
+  }
+};
+
+
+
+exports.changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    const user = await User.findById(req.user._id);
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Contraseña actual incorrecta' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ message: 'Contraseña actualizada con éxito' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error al cambiar contraseña' });
+  }
+};
+
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: 'Error al obtener usuarios' });
+  }
+};
+
+
+exports.updateUserRole = async (req, res) => {
+  const { id } = req.params;
+  const { type } = req.body;
+
+  try {
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    } 
+
+    if (req.user._id.toString() === id) {
+  return res.status(400).json({ message: 'No puedes cambiar tu propio rol' });
+    }
+
+
+    user.type = type;
+    await user.save();
+
+    res.json({ message: `Tipo de usuario actualizado a ${type}` });
+  } catch (err) {
+    res.status(500).json({ message: 'Error al actualizar el tipo de usuario', error: err.message });
+  }
+};
+
+exports.getUsers = async (req, res) => {
+  const keyword = req.query.search
+    ? {
+        $or: [
+          { fullName: { $regex: req.query.search, $options: 'i' } },
+          { email: { $regex: req.query.search, $options: 'i' } }
+        ]
+      }
+    : {};
+
+  try {
+    const users = await User.findOne(keyword).select('-password');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: 'Error al obtener usuarios' });
+  }
+};
+
+
+
