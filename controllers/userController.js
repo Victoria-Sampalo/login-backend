@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
+const { sendInvitationEmail } = require('../utils/email');
 
 exports.registerUser = async (req, res) => {
   const { fullName, email, password } = req.body;
@@ -61,6 +62,28 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ message: 'El token de invitación ha expirado' });
     }
     res.status(500).json({ message: 'Error al crear usuario' });
+  }
+};
+
+exports.inviteUser = async (req, res) => {
+  const { fullName, email } = req.body;
+
+  console.log("[INVITE BODY]", { fullName, email });
+
+  try {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'El usuario ya existe' });
+    }
+
+    const token = jwt.sign({ fullName, email }, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+    await sendInvitationEmail(fullName, email, token);
+
+    res.status(200).json({ message: `Invitación enviada a ${email}` });
+  } catch (err) {
+    console.error('[INVITE ERROR]', err);
+    res.status(500).json({ message: 'Error al enviar invitación' });
   }
 };
 
