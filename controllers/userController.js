@@ -91,12 +91,15 @@ exports.inviteUser = async (req, res) => {
 
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
+  console.log('Usuario encontrado:', email);
+console.log('Password hash:', password);
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: 'Credenciales inválidas' });
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(400).json({ message: 'Credenciales inválidas' });
+    console.log("login user en controller")
 
     const token = generateToken(user);
 
