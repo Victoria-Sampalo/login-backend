@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 const { sendInvitationEmail } = require('../utils/email');
+const { generateToken } = require('../utils/tokenUtils'); // Ajusta la ruta si es necesario
 
 exports.registerUser = async (req, res) => {
   const { fullName, email, password } = req.body;
